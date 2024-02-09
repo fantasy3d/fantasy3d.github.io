@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy City</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js",
+            "@fantasy3d/postprocessing": "../dist/fantasy.postprocessing.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Box3, Color, DoubleSide, Euler, LinearFilter, Mesh, MeshBasicMaterial, HalfFloatType, PlaneGeometry, ShaderMaterial, Vector3 } from 'three';
+            import { DirectionalLight, Engine, EventType, GLTFParser, MeshRenderer, OrbitController, Reflector, Scene, SceneRenderer, createFBO } from '@fantasy3d/core';
+            import { Floating, Text } from '@fantasy3d/addons';
+            import { BlendFunction, BloomEffect, EffectRenderer } from '@fantasy3d/postprocessing';
+
+            // Reflector vertex shader
+            const vertexShader = `
+                #include <common>
+                #include <fog_pars_vertex>
+                #include <clipping_planes_pars_vertex>
+
+                varying vec4 vCoord;
+
+                uniform mat4 textureMatrix;
+
+                void main() {
+
+                    vCoord = textureMatrix * vec4( position, 1.0 );
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4( position.x, position.y, position.z, 1.0 );
+                    #include <clipping_planes_vertex>
+                    #include <fog_vertex>
+
+                }
+            `;
+
+            // Reflector fragment shader
+            const fragmentShader = `
+                uniform float opacity;
+                uniform float strength;
+                uniform vec3 color;
+                uniform sampler2D reflectionMap;
+
+                varying vec4 vCoord;
+
+                #include <common>
+                #include <fog_pars_fragment>
+                #include <clipping_planes_pars_fragment>
+
+                void main() {
+
+                    #include <clipping_planes_fragment>
+
+                    vec4 diffuseColor = vec4( color, opacity );
+
+                    vec4 reflectionColor = texture2DProj( reflectionMap, vCoord );
+                    diffuseColor.rgb = mix( diffuseColor.rgb, reflectionColor.rgb * strength, reflectionColor.a * strength );
+
+                    gl_FragColor = diffuseColor;
+
+                    #include <tonemapping_fragment>
+                    #include <colorspace_fragment>
+                    #include <fog_fragment>
+
+                }
+            `;	
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: '#171720'
+
+                }
+
+            } );
+
+            // Create a render target
+            const { gl, resourceManager } = engine;
+            const renderTarget = createFBO( {
+
+                width: Math.floor( 1024 * gl.getPixelRatio() ),
+                height: Math.floor( 1024 * gl.getPixelRatio() ),
+                renderTargetOptions: {
+
+                    type: HalfFloatType,
+                    minFilter: LinearFilter,
+                    magFilter: LinearFilter,
+                    samples: 8,
+                    stencilBuffer: false,
+                    depthBuffer: true,
+                    generateMipmaps: false
+
+                }
+
+            } );
+
+            // Create scene renderer
+            const sceneRenderer = new SceneRenderer( engine );
+
+            // Create effec renderer
+            const effectRenderer = new EffectRenderer( engine, { autoClear: true, multisampling: 4, enableNormalPass: false } );
+
+            // Create bloom effect.
+            const effect = new BloomEffect( {
+
+                blendFunction: BlendFunction.ADD,
+                mipmapBlur: true,
+                intensity: 1.2,
+
+            } );
+
+            // Add bloom effect
+            effectRenderer.addEffect( effect );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Create scene
+            const scene = new Scene( engine, { 
+                
+                ambientLight: { intensity: 0.15 * Math.PI }, 
+                environment: { url: './assets/textures/hdr/equirectangular/venice_sunset_1k.hdr' },
+
+            } );
+
+            // Set effect renderer as scene renderer
+            scene.sceneRenderer = effectRenderer;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -114.70950245262286, 49.304041859600936, 262.870875061015 ),
+                    rotation: new Euler( -0.19376472882595586, -0.4925966303147752, -0.09253359436458898 )
+
+                },
+                camera: { near: 1.0, far: 1000.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true, maxPolarAngle: Math.PI * 0.45 } );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Add a directional light
+            scene.rootEntity.addComponent( DirectionalLight, {
+
+                intensity: 1.0 * Math.PI,
+                position: new Vector3( 100.0, 100.0, 100.0 ),
+                target: new Vector3( 0, 0, 0 )
+
+            } );
+
+            // Create a entity
+            const entity = scene.rootEntity.createChild( { 
+                
+                transform: { position: new Vector3( 0.0, 2.5, -5.0 ) } 
+            
+            } );
+
+            // Add a Text component
+            const bloomColor = new Color( 'rgb( 186, 217, 220 )' );
+            bloomColor.multiplyScalar(1.5);
+
+            const text = entity.addComponent( Text, { 
+                
+                attributes: {
+
+                    text: 'Fantasy \n City',
+                    //font: 'https://fonts.gstatic.com/s/sirinstencil/v6/mem4YaWwznmLx-lzGfN7MdRyRc9MAQ.woff',
+                    font: './assets/fonts/Poppins-Black.ttf',
+                    fontSize: 20,
+                    lineHeight: 1.0,
+                    textAlign: 'center',
+                    anchorX: 'right',
+                    anchorY: 'bottom',
+                    material: new MeshBasicMaterial( { color: bloomColor, map: renderTarget.texture, toneMapped: false, side: DoubleSide } )
+
+                }
+
+            } );
+
+            // Load glb
+            resourceManager.loadGLTF( './assets/models/city.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                scene.rootEntity.addChild( entity );
+
+                // Get world bounds
+                const { min, max } = entity.getWorldBounds( new Box3(), true );
+
+                // Update transform
+                const { transform } = entity;
+                transform.position = new Vector3( ( max.x - min.x ) * 0.5, 0.0, ( max.z + min.z ) * 0.5 );
+                transform.rotation = new Euler( 0.0, -Math.PI / 5.0, 0.0 );
+
+                // Create a reflector
+                const uniforms = {
+
+                    opacity: { value: 1.0 },
+                    color: { value: new Color( '#171720' ) },
+                    strength: { value: 0.15 },
+                    reflectionMap: { value: null },
+                    textureMatrix: { value: null }
+
+                }
+
+                const geometry = new PlaneGeometry( 1000, 1000 );
+                const material = new ShaderMaterial( {
+
+                    vertexShader: vertexShader,
+                    fragmentShader: fragmentShader,
+
+                    uniforms: uniforms,
+
+                    transparent: true
+
+                } );
+                const reflector = new Reflector( {
+
+                    resolution: 1048,
+                    samples: 4,
+                    //blur: 1000,
+                    clearColor: '#171720',
+                    clearAlpha: 0.0,
+                    depthScale: 0.01,
+                    depthToBlurRatioBias: 0.25
+
+                } );
+
+                uniforms.textureMatrix.value = reflector.textureMatrix;
+				uniforms.reflectionMap.value = reflector.texture;
+
+                const mesh = new Mesh( geometry, material );
+                mesh.rotation.set( -Math.PI * 0.5, 0.0, 0.0 );
+                mesh.add( reflector );
+
+                scene.rootEntity.addComponent( MeshRenderer, {
+
+                    mesh,
+                    onBeforeRender: ( renderer, scene, camera ) => {
+
+                        mesh.visible = false;
+                        reflector.render( renderer, scene, camera );
+                        mesh.visible = true;
+
+                    }
+
+                } );
+
+            } );
+
+            // Create secondary scene
+            const secondaryScene = new Scene( engine, {
+
+                ambientLight: { intensity: 0.15 * Math.PI },
+                //background: '#6db06b',
+                background: bloomColor,
+                environment: { url: './assets/textures/hdr/equirectangular/venice_sunset_1k.hdr' }
+
+            } );
+
+            // Set scene renderer
+            secondaryScene.sceneRenderer = sceneRenderer;
+
+            // Create a perspective camera
+            const secondaryCamera = secondaryScene.createPerspectiveCamera( {
+
+                transform: {
+
+                    position: new Vector3( 0.0, 90.0, 90.0 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { 
+                    
+                    near: 1.0, 
+                    far: 500.0,
+                    renderTarget // Render to target
+                
+                }
+
+            } );
+
+            // Add a directional light
+            secondaryScene.rootEntity.addComponent( DirectionalLight, {
+
+                intensity: 1.0 * Math.PI,
+                position: new Vector3( 100.0, 100.0, 100.0 ),
+                target: new Vector3( 0, 0, 0 )
+
+            } );
+
+            // Load glb for secondary scene
+            resourceManager.loadGLTF( './assets/models/city.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to secondary scene
+                secondaryScene.rootEntity.addChild( entity );
+
+                // Add a Floating script
+                entity.addComponent( Floating, {
+
+                    floatingIntensity: 4,
+                    rotationIntensity: 5
+
+                } );
+
+            } );
+
+            // Active secondary scene
+            secondaryScene.isActive = true;
+
+		</script>
+	</body>
+</html>

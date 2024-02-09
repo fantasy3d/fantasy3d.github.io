@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Spot Light</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Euler, Vector2, Vector3 } from 'three';
+            import { Engine, EventType, GLTFParser, Scene, SceneRenderer, SpotLight } from '@fantasy3d/core';
+            import { OrbitController, SpotLightHelper } from '@fantasy3d/addons'
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'rgb( 201, 207, 183 )'
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Create scene
+            const scene = new Scene( engine );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -1.9211888932328502, 60.21071921767978, 63.828772416960604 ),
+                    rotation: new Euler( -0.6586514135431999, 0.006682986548691832, 0.005172187945333099 )
+
+                },
+                camera: { near: 0.1, far: 1000.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Add a spot light
+            const { rootEntity } = scene;
+            const spotLight = rootEntity.addComponent( SpotLight, {
+
+                color: '#ffffff',
+                intensity: 600.0 * Math.PI,
+                distance: 100.0,
+                angle: ( 30.0 * Math.PI ) / 180.0, 
+                penumbra: 0.0,
+                position: new Vector3( 0.0, 50.0, 0.0 ),
+                target: new Vector3( 0.0, 0.0, 0.0 )
+
+            } );
+
+            // Add a spot light helper
+            const helper = rootEntity.addComponent( SpotLightHelper );
+
+            // Load glb
+            engine.resourceManager.loadGLTF( './assets/models/futuristic_building.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                rootEntity.addChild( entity );
+
+            } );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Set ui
+            const vec3 = new Vector3();
+
+            const params = {
+
+                intensity: 600.0,
+                distance: 100.0,
+                angle: 30,
+                penumbra: 0.0,
+                color: '#ffffff',
+                position: { x: 0.0, y: 50.0, z: 0.0 },
+                target: { x: 0.0, y: 0.0, z: 0.0 },
+                helper: true
+
+            }
+
+            pane.addBinding( params, 'intensity', {
+
+                min: 0,
+                max: 3000,
+                step: 1.0
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                spotLight.intensity = value * Math.PI;
+
+            } );
+
+            pane.addBinding( params, 'distance', {
+
+                min: 0,
+                max: 500,
+                step: 1.0
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                spotLight.distance = value;
+
+            } );
+
+            pane.addBinding( params, 'angle', {
+
+                min: 0,
+                max: 90,
+                step: 1.0
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                spotLight.angle = ( value * Math.PI ) / 180.0;
+
+            } );
+
+            pane.addBinding( params, 'penumbra', {
+
+                min: 0.0,
+                max: 1.0,
+                step: 0.1
+                
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                spotLight.penumbra = value;
+
+            } );
+
+            pane.addBinding( params, 'color', {
+
+                picker: 'inline',
+                expanded: false
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                spotLight.color = value;
+
+            } );
+
+            pane.addBinding( params, 'position', {
+
+                x: { step: 1.0 },
+                y: { step: 1.0 },
+                z: { step: 1.0 }
+
+            } ).on( 'change', ( event ) => {
+
+                const { x, y, z } = event.value;
+                vec3.set( x, y, z );
+                spotLight.position = vec3;
+
+            } );
+
+            pane.addBinding( params, 'target', {
+
+                x: { step: 1.0 },
+                y: { step: 1.0 },
+                z: { step: 1.0 }
+
+            } ).on( 'change', ( event ) => {
+
+                const { x, y, z } = event.value;
+                vec3.set( x, y, z );
+                spotLight.target = vec3;
+
+            } );
+
+            pane.addBinding( params, 'helper' ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                helper.visible = value;
+
+            } );
+
+		</script>
+	</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Camera Render To Target</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Box3, DoubleSide, Euler, LinearFilter, Mesh, MeshBasicMaterial, HalfFloatType, PlaneGeometry, Vector3, Vector4 } from 'three';
+            import { AmbientLight, Animator, Engine, EventType, GLTFParser, MeshRenderer, Scene, SceneRenderer, createFBO } from '@fantasy3d/core';
+            import { OrbitController } from '@fantasy3d/addons';
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'rgb( 201, 207, 183 )'
+
+                }
+
+            } );
+
+            // Create scene renderer
+            const sceneRenderer = new SceneRenderer( engine );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Create a render target
+            const { gl, resourceManager } = engine;
+            const renderTarget = createFBO( {
+
+                width: Math.floor( 1024 * gl.getPixelRatio() ),
+                height: Math.floor( 1024 * gl.getPixelRatio() ),
+                renderTargetOptions: {
+
+                    type: HalfFloatType,
+                    minFilter: LinearFilter,
+                    magFilter: LinearFilter,
+                    samples: 8,
+                    stencilBuffer: false,
+                    depthBuffer: true,
+                    generateMipmaps: false
+
+                }
+
+            } ); 
+
+            // Create scene
+            const scene = new Scene( engine );
+
+            // Set scene renderer
+            scene.sceneRenderer = sceneRenderer;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0, 10, 10 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { near: 0.1, far: 1000.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Create plane
+            const entity = scene.rootEntity.createChild();
+            entity.addComponent( MeshRenderer, {
+
+                mesh: new Mesh( 
+                    
+                    new PlaneGeometry( 10, 10 ), 
+                    new MeshBasicMaterial( { map: renderTarget.texture, side: DoubleSide } ) 
+                    
+                )
+
+            } );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create secondary scene
+            const secondaryScene = new Scene( engine, { 
+                
+                environment: { url: './assets/textures/hdr/equirectangular/HDR_041_Path_Env.hdr' },
+                background: '#deac0f'
+            
+            } );
+
+            // Set scene renderer
+            secondaryScene.sceneRenderer = sceneRenderer;
+
+            // Create a perspective camera for secondary scene
+            const secondaryCamera = secondaryScene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0, 100, 200 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { 
+                    
+                    near: 0.1, 
+                    far: 1000.0,
+                    renderTarget // Render to target
+                
+                }
+
+            } );
+
+            // Creat another perspective camera for secondary scene
+            const thridCamera = secondaryScene.createPerspectiveCamera( {
+
+                transform: {
+
+                    position: new Vector3( 0, 150.0, 0 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: {
+
+                    near: 1.0,
+                    far: 500.0,
+                    viewport: new Vector4( 0.7, 0.7, 0.3, 0.3 ),
+                    renderTarget // Render to target
+
+                }
+
+            } );
+
+            // Add a ambient light for secondary scene
+            secondaryScene.rootEntity.addComponent( AmbientLight, { color: '#ffffff', intensity: 0.15 * Math.PI } );
+
+            // Load glb for secondary scene
+            resourceManager.loadGLTF( './assets/models/medieval_fantasy_book.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                secondaryScene.rootEntity.addChild( entity );
+
+                // Get Animator component
+                const { controller } = entity.getComponent( Animator );
+
+                // Play 'The Life' animation
+                controller.play( 'The Life' );
+
+            } );
+
+            // Active secondary scene
+            secondaryScene.isActive = true;
+
+		</script>
+	</body>
+</html>

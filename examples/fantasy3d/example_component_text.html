@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Text Component</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Euler, Vector3 } from 'three';
+            import { Engine, EventType, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { OrbitController, Text } from '@fantasy3d/addons'
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: '#171717'
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Create scene
+            const scene = new Scene( engine );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0.0, 60, 60 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { near: 0.1, far: 1000.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create a entity
+            const { rootEntity } = scene;
+            const entity = rootEntity.createChild();
+
+            // Add a Text component
+            const text = entity.addComponent( Text, { 
+                
+                text: 'Fantasy 3D',
+                fontSize: 10,
+                anchorX: 'center',
+                anchorY: 'bottom',
+                rotation: new Euler( -Math.PI / 3.0, 0.0, 0.0 )
+
+            } );
+
+            // Set ui
+            pane.addBlade( {
+
+                view: 'list',
+                label: 'text',
+                options: [
+                    { text: 'English', value: 'Fantasy 3D' },
+                    { text: 'Chinese', value: '梦幻3D' },
+                    { text: 'Chinese(Traditional)', value: '夢幻3D' },
+                    { text: 'Russian', value: 'Мечты 3D' },
+                    { text: 'Korean', value: '몽환 3D' },
+                    { text: 'Japanese', value: 'ファンタジー3D' },
+                    { text: 'Emoji', value: 'Examples of emoji are 😂, 😃, 🧘🏻‍♂️, 🌍, 🌦️, 🥖, 🚗, 📱, 🎉, ❤️, ✅, and 🏁.' }
+                ],
+                value: 'Fantasy 3D'
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.text = value;
+
+            } );
+
+            pane.addBlade( {
+
+                view: 'list',
+                label: 'font',
+                options: [
+                    { text: 'Noto Sans (none)', value: null },
+                    { text: 'Roboto', value: 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff' },
+                    { text: 'Alex Brush', value: 'https://fonts.gstatic.com/s/alexbrush/v8/SZc83FzrJKuqFbwMKk6EhUXz6w.woff' },
+                    { text: 'Comfortaa', value: 'https://fonts.gstatic.com/s/comfortaa/v12/1Ptsg8LJRfWJmhDAuUs4TYFs.woff' },
+                    { text: 'Cookie', value: 'https://fonts.gstatic.com/s/cookie/v8/syky-y18lb0tSbf9kgqU.woff' },
+                    { text: 'Cutive Mono', value: 'https://fonts.gstatic.com/s/cutivemono/v6/m8JWjfRfY7WVjVi2E-K9H6RCTmg.woff' },
+                    { text: 'Gabriela', value: 'https://fonts.gstatic.com/s/gabriela/v6/qkBWXvsO6sreR8E-b8m5xL0.woff' },
+                    { text: 'Monoton', value: 'https://fonts.gstatic.com/s/monoton/v9/5h1aiZUrOngCibe4fkU.woff' },
+                    { text: 'Philosopher', value: 'https://fonts.gstatic.com/s/philosopher/v9/vEFV2_5QCwIS4_Dhez5jcWBuT0s.woff' },
+                    { text: 'Quicksand', value: 'https://fonts.gstatic.com/s/quicksand/v7/6xKtdSZaM9iE8KbpRA_hK1QL.woff' },
+                    { text: 'Trirong', value: 'https://fonts.gstatic.com/s/trirong/v3/7r3GqXNgp8wxdOdOn4so3g.woff' },
+                    { text: 'Trocchi', value: 'https://fonts.gstatic.com/s/trocchi/v6/qWcqB6WkuIDxDZLcPrxeuw.woff' },
+                    { text: 'Advent Pro', value: 'https://fonts.gstatic.com/s/adventpro/v7/V8mAoQfxVT4Dvddr_yOwhTqtLg.woff' },
+                    { text: 'Henny Penny', value: 'https://fonts.gstatic.com/s/hennypenny/v5/wXKvE3UZookzsxz_kjGSfPQtvXQ.woff' },
+                    { text: 'Orbitron', value: 'https://fonts.gstatic.com/s/orbitron/v9/yMJRMIlzdpvBhQQL_Qq7dys.woff' },
+                    { text: 'Sacramento', value: 'https://fonts.gstatic.com/s/sacramento/v5/buEzpo6gcdjy0EiZMBUG4C0f-w.woff' },
+                    { text: 'Snowburst One', value: 'https://fonts.gstatic.com/s/snowburstone/v5/MQpS-WezKdujBsXY3B7I-UT7SZieOA.woff' },
+                    { text: 'Syncopate', value: 'https://fonts.gstatic.com/s/syncopate/v9/pe0sMIuPIYBCpEV5eFdCBfe5.woff' },
+                    { text: 'Wallpoet', value: 'https://fonts.gstatic.com/s/wallpoet/v9/f0X10em2_8RnXVVdUObp58I.woff' },
+                    { text: 'Sirin Stencil', value: 'https://fonts.gstatic.com/s/sirinstencil/v6/mem4YaWwznmLx-lzGfN7MdRyRc9MAQ.woff' }
+                ],
+                value: null
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.font = value;
+
+            } );
+
+            pane.addBinding( { 'font size': 10 }, 'font size', {
+
+                min: 0.5,
+                max: 100.0,
+                step: 0.5
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.fontSize = value;
+
+            } );
+
+            pane.addBlade( {
+
+                view: 'list',
+                label: 'anchor x',
+                options: [
+                    { text: 'left', value: 'left' },
+                    { text: 'right', value: 'right' },
+                    { text: 'center', value: 'center' }
+                ],
+                value: 'center'
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.anchorX = value;
+
+            } );
+
+            pane.addBlade( {
+
+                view: 'list',
+                label: 'anchor y',
+                options: [
+                    { text: 'top', value: 'top' },
+                    { text: 'top-baseline', value: 'top-baseline' },
+                    { text: 'top-cap', value: 'top-cap' },
+                    { text: 'top-ex', value: 'top-ex' },
+                    { text: 'middle', value: 'middle' },
+                    { text: 'bottom-baseline', value: 'bottom-baseline' },
+                    { text: 'bottom', value: 'bottom' }
+                ],
+                value: 'bottom'
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.anchorY = value;
+
+            } );
+
+            pane.addBinding( { color: '#ffffff' }, 'color', {
+
+                picker: 'inline',
+                expanded: false
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.color = value;
+
+            } );
+            
+            pane.addBinding( { 'outline width': 0.0 }, 'outline width', {
+
+                min: 0.0,
+                max: 1.0,
+                step: 0.05
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.outlineWidth = value;
+
+            } );
+
+            pane.addBinding( { 'outline color': '#000000' }, 'outline color', {
+
+                picker: 'inline',
+                expanded: false
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.outlineColor = value;
+
+            } );
+
+            pane.addBinding( { 'outline opacity': 1.0 }, 'outline opacity', {
+
+                min: 0.0,
+                max: 1.0,
+                step: 0.1
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                text.outlineOpacity = value;
+
+            } );
+
+		</script>
+	</body>
+</html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Orthographic Camera</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #secondary_viewport {
+
+                background-color: transparent;
+                width: 20%;
+                height: 20%;
+                position: absolute;
+                right: 0%;
+                bottom: 0%;
+                border: 2px solid gray;
+
+            }
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+        <div id="secondary_viewport" class="secondary_viewport"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Euler, UVMapping, Vector3, Vector4 } from 'three';
+            import { AmbientLight, DirectionalLight, Engine, EventType, GLTFParser, OrthographicCamera, PerspectiveCamera, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { CameraHelper, OrbitController } from '@fantasy3d/addons';
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'rgb( 201, 207, 183 )'
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Create scene
+            const scene = new Scene( engine );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Create main perspective camera
+            const mainCamera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -1.9211888932328502, 60.21071921767978, 63.828772416960604 ),
+                    rotation: new Euler( -0.6586514135431999, 0.006682986548691832, 0.005172187945333099 )
+
+                },
+                camera: { near: 0.1, far: 1500.0 }
+
+            } );
+
+            // Add orbitcontroller
+            mainCamera.addComponent( OrbitController, { damping: true } );
+
+            // Create secondary orthographic camera
+            const secondaryCamera = scene.createOrthographicCamera( {
+
+                transform: { position: new Vector3( 0.0, 10.0, 40.0 ) },
+                camera: {
+
+                    near: 10.0,
+                    far: 150.0,
+                    frustumSize: 50.0,
+                    viewport: new Vector4( 0.8, 0.8, 0.2, 0.2 )
+
+                }
+
+            } );
+
+            // Add camera helper
+            const helper = secondaryCamera.addComponent( CameraHelper );
+
+            // Get OrthographicCamera component
+            const camera = secondaryCamera.getComponent( OrthographicCamera );
+
+            // Camera helper visible
+            let helperVisible = true
+
+            // Subscribe BEFORE_CAMERA_RENDER event
+            camera.on( EventType.BEFORE_CAMERA_RENDER, () => {
+
+                // Hide camera helper
+                helper.visible = false;
+
+            } );
+
+            // Subscribe AFTER_CAMERA_RENDER event
+            camera.on( EventType.AFTER_CAMERA_RENDER, () => {
+
+                // Show camera helper
+                helper.visible = helperVisible;
+
+            } );
+
+            // Add a ambient light
+            const { rootEntity } = scene;
+            rootEntity.addComponent( AmbientLight, { color: '#ffffff', intensity: 0.25 * Math.PI } );
+
+            // Add a directional light
+            const directionalLight = rootEntity.addComponent( DirectionalLight, {
+
+                color: '#ffffff',
+                intensity: 1.0 * Math.PI,
+                position: new Vector3( 20.0, 20.0, 20.0 ),
+                target: new Vector3( 0.0, 0.0, 0.0 )
+
+            } );
+
+            // Load glb
+            engine.resourceManager.loadGLTF( './assets/models/futuristic_building.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                scene.rootEntity.addChild( entity );
+
+            } );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Set ui
+            const position = new Vector3();
+            const rotation = new Euler();
+
+            const params = {
+
+                'near': 10.0,
+                'far': 150.0,
+                'frustum Size': 50.0,
+                'position': { x: 0.0, y: 10.0, z: 40.0 },
+                'rotation': { x: 0.0, y: 0.0, z: 0.0 },
+                'helper visible': helperVisible
+
+            }
+
+            pane.addBinding( params, 'near', {
+
+                min: 0.0,
+                max: 500.0,
+                step: 1.0
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                camera.near = value;
+
+            } );
+
+            pane.addBinding( params, 'far', {
+
+                min: 0.0,
+                max: 500.0,
+                step: 1.0
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                camera.far = value;
+
+            } );
+
+            pane.addBinding( params, 'frustum Size', {
+
+                min: 20,
+                max: 200,
+                step: 1.0
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                camera.frustumSize = value;
+
+            } );
+
+            pane.addBinding( params, 'position', {
+
+                x: { step: 1.0 },
+                y: { step: 1.0 },
+                z: { step: 1.0 }
+
+            } ).on( 'change', ( event ) => {
+
+                const { x, y, z } = event.value;
+                position.set( x, y, z );
+                secondaryCamera.transform.position = position;
+
+            } );
+
+            pane.addBinding( params, 'rotation', {
+
+                x: { step: 1.0 },
+                y: { step: 1.0 },
+                z: { step: 1.0 }
+
+            } ).on( 'change', ( event ) => {
+
+                const { x, y, z } = event.value;
+                rotation.set( ( x * Math.PI ) / 180.0, ( y * Math.PI ) / 180.0, ( z * Math.PI ) / 180.0 );
+                secondaryCamera.transform.rotation = rotation;
+
+            } );
+
+            pane.addBinding( params, 'helper visible' ).on( 'change', ( event ) => {
+            
+                const { value } = event;
+                helper.visible = helperVisible = value;
+
+            } );
+
+		</script>
+	</body>
+</html>

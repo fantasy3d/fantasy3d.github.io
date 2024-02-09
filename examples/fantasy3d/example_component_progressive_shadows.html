@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Progressive Shadows Component</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+        <script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { BoxGeometry, CanvasTexture, Euler, Mesh, MeshStandardMaterial, RepeatWrapping, SphereGeometry, UVMapping, Vector3 } from 'three';
+            import { FlakesTexture } from 'three/examples/jsm/textures/FlakesTexture.js';
+            import { AmbientLight, DirectionalLight, Engine, EventType, GLTFParser, MeshRenderer, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { OrbitController, ProgressiveShadows } from '@fantasy3d/addons';
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'orange',
+                    shadowMap: { enabled: true }
+
+                }
+
+            } );   
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Resource manager
+            const { resourceManager } = engine;
+
+            // Set glTFLoader draco loader
+            resourceManager.setDRACOLoader( 'https://www.gstatic.com/draco/versioned/decoders/1.5.5/' );
+
+            // Create scene
+            const scene = new Scene( engine, {
+
+                background: { url: './assets/textures/hdr/equirectangular/potsdamer_platz_1k.hdr' },
+                backgroundBlurriness: 0.8,
+                environment: { url: './assets/textures/hdr/equirectangular/potsdamer_platz_1k.hdr' }
+
+            } );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0.0, 10, 10 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { near: 0.1, far: 500.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Create a box 
+            const { rootEntity } = scene;
+            const box = rootEntity.createChild( { 
+                
+                transform: { 
+                    
+                    position: new Vector3( 2.5, 0.5, 1 ),
+                    rotation: new Euler( 0.0, Math.PI / 4.0, 0 )
+                
+                } 
+            
+            } );
+            
+            const boxMesh = new Mesh( new BoxGeometry( 1.0, 1.0, 1.0 ), new MeshStandardMaterial( { color: 'indianred' } ) );
+            // boxMesh.receiveShadow = true;
+            boxMesh.castShadow = true;
+            box.addComponent( MeshRenderer, { mesh: boxMesh } );
+
+            // Create a sphere
+            const sphere = rootEntity.createChild( { transform: { position: new Vector3( -2.0, 0.5, 1.0 ) } } );
+
+            const sphereMesh = new Mesh( new SphereGeometry( 0.5, 64, 64 ), new MeshStandardMaterial( { color: 'lightblue', roughness: 0.0 } ) );
+            // sphereMesh.receiveShadow = true;
+            sphereMesh.castShadow = true;
+            sphere.addComponent( MeshRenderer, { mesh: sphereMesh } );
+
+            // Load glb model
+            resourceManager.loadGLTF( './assets/models/suzanne.gltf' ).then( ( resource ) => {
+
+                // Fix materials
+                const { materials } = resource;
+                materials.default.color.set( 'orange' );
+                materials.default.roughness = 0.0;
+                materials.default.normalMap = new CanvasTexture( new FlakesTexture(), UVMapping, RepeatWrapping, RepeatWrapping );
+                materials.default.normalMap.repeat.set( 40, 40 );
+                materials.default.normalScale.set( 0.1, 0.1 );
+
+                // Parse gltf resource
+                const entity = GLTFParser.parse( resource, { castShadow: true } );
+
+                // Add to scene
+                rootEntity.addChild( entity );
+
+                // Update transformation
+                entity.transform.setTransformation( {
+
+                    position: new Vector3( 0.0, -0.8, 0.0 ),
+                    scale: new Vector3( 2, 2, 2 ),
+                    rotation: new Euler( -0.63, 0, 0 )
+
+                } );
+
+                // Create Progressive Shadows
+                const shadowsEntity = rootEntity.createChild( { transform: { position: new Vector3( 0.0, 0.0, 0.0 ) } } );
+                const progressiveShadows = shadowsEntity.addComponent( ProgressiveShadows, {
+
+                    width: 10,
+                    height: 10,
+                    frames: 40,
+                    alphaTest: 0.75,
+                    resolution: 1024,
+                    lights: {
+
+                        amount: 8,
+                        radius: 4.0,
+                        position: new Vector3( 5, 5, -5 ),
+                        shadow: { 
+
+                            bias: 0.001,
+                            mapSize: 1024,
+                            camera: { near: 1, far: 100.0, frustumSize: 100 }
+
+                        }
+
+                    }
+
+                } );
+
+                // Set ui
+                const params = {
+
+                    frames: 40,
+                    radius: 4.0,
+                    ambient: 0.5,
+                    color: '#000000',
+                    opacity: 1.0,
+                    alphaTest: 0.75
+
+                };
+
+                pane.addBinding( params, 'frames', {
+
+                    min: 2,
+                    max: 200,
+                    step: 1
+
+                } ).on( 'change', ( event ) => {
+
+                    const { value } = event;
+                    progressiveShadows.frames = value;
+
+                } );
+
+                pane.addBinding( params, 'radius', {
+
+                    min: 0,
+                    max: 30.0,
+                    step: 0.1
+
+                } ).on( 'change', ( event ) => {
+
+                    const { value } = event;
+                    progressiveShadows.radius = value;
+
+                } );
+
+                pane.addBinding( params, 'ambient', {
+
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.1
+
+                } ).on( 'change', ( event ) => {
+
+                    const { value } = event;
+                    progressiveShadows.ambient = value;
+
+                } );
+
+                pane.addBinding( params, 'color', {
+
+                    picker: 'inline',
+                    expanded: false
+
+                } ).on( 'change', ( event ) => {
+
+                    const { value } = event;
+                    progressiveShadows.color = value;
+
+                } );
+
+                pane.addBinding( params, 'opacity', {
+
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.1
+
+                } ).on( 'change', ( event ) => {
+
+                    const { value } = event;
+                    progressiveShadows.opacity = value;
+
+                } );
+
+                pane.addBinding( params, 'alphaTest', {
+
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.01
+
+                } ).on( 'change', ( event ) => {
+
+                    const { value } = event;
+                    progressiveShadows.alphaTest = value;
+
+                } );
+
+            } );
+
+        </script>
+    </body>
+</html>

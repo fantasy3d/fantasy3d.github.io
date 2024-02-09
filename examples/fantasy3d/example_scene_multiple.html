@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Multiple Scene</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script src="./js/ReflectShader.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Box3, Color, Euler, Mesh, MeshLambertMaterial, PlaneGeometry, ShaderMaterial, Vector2, Vector3, Vector4 } from 'three';
+            import { AmbientLight, DirectionalLight, Engine, EventType, MeshRenderer, GLTFParser, Reflector, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { OrbitController } from '@fantasy3d/addons';
+
+            // Create ui
+            //const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: true } );
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: '#171717',
+                    shadowMap: { enabled: true }
+
+                }
+
+            } );
+
+            // Create scene renderer
+            const sceneRenderer = new SceneRenderer( engine );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Resource manager
+            const { resourceManager } = engine;
+
+            // Create scene 1
+            const scene1 = new Scene( engine, { 
+                
+                background: 'rgb( 23, 39, 28 )',
+                environment: { url: './assets/textures/hdr/equirectangular/HDR_041_Path_Env.hdr' }
+
+            } );
+
+            // Set scene renderer
+            scene1.sceneRenderer = sceneRenderer;
+
+            // Add a ambient light for scene 1
+            scene1.rootEntity.addComponent( AmbientLight, { intensity: 0.15 * Math.PI } );
+
+            // Create a perspective camera for scene 1
+            const camera1 = scene1.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -192.4492823342801, 197.83243087813187, -146.9131714907436 ), 
+                    rotation: new Euler(  -2.507137973479189, -0.5622810771276153, -2.7676958136265006 )
+                },
+                camera: { 
+
+                    near: 0.1,
+                    far: 1000.0,
+                    viewport: new Vector4( 0.0, 0.0, 0.5, 1.0 )
+
+                }
+
+            } );
+
+            // Add orbit controller for camera 1
+            camera1.addComponent( OrbitController, { damping: true } );
+
+            // Load glb model for scene 1
+            resourceManager.loadGLTF( './assets/models/oldsmobile_cutlass_supreme_sedan_71.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene 1
+                const { rootEntity } = scene1;
+                rootEntity.addChild( entity );
+
+                // Get world bounds
+                const { min, max } = entity.getWorldBounds( new Box3(), true );
+
+                // Create a reflector
+                const uniforms = {
+
+                    opacity: { value: 0.5 },
+                    color: { value: new Color( 'rgb( 26, 44, 32 )' ) },
+                    strength: { value: 0.5 },
+                    reflectionMap: { value: null },
+                    textureMatrix: { value: null }
+
+                }
+
+                const geometry = new PlaneGeometry( 1000, 1000 );
+
+                const material = new ShaderMaterial( {
+
+                    vertexShader: reflect_vertexShader,
+                    fragmentShader: reflect_fragmentShader,
+
+                    uniforms: uniforms,
+
+                    transparent: true,
+                    depthTest: true,
+                    depthWrite: false,
+
+                    toneMapped: false
+
+                } );
+
+                const reflector = new Reflector( {
+
+                    resolution: 2048,
+                    samples: 4,
+                    //blur: 1000,
+                    depthScale: 0.01,
+                    depthToBlurRatioBias: 0.25
+
+                } );
+
+                uniforms.textureMatrix.value = reflector.textureMatrix;
+				uniforms.reflectionMap.value = reflector.texture;
+
+                const mesh = new Mesh( geometry, material );
+                mesh.position.set( 0.0, min.y - 0.5, 0.0 );
+                mesh.rotation.set( -Math.PI * 0.5, 0.0, 0.0 );
+                mesh.add( reflector );
+
+                rootEntity.addComponent( MeshRenderer, {
+
+                    mesh,
+                    onBeforeRender: ( renderer, scene, camera ) => {
+
+                        mesh.visible = false;
+                        reflector.render( renderer, scene, camera );
+                        mesh.visible = true;
+
+                    }
+
+                } );
+
+            } );
+
+            // Active scene 1
+            scene1.isActive = true;
+
+            // Create scene 2
+            const scene2 = new Scene( engine, { 
+                
+                background: 'rgb( 176, 215, 215 )', 
+                environment: { url: './assets/textures/hdr/equirectangular/royal_esplanade_1k.hdr' }
+
+            } );
+
+            // Set scene renderer
+            scene2.sceneRenderer = sceneRenderer;
+
+            // Create a perspective camera for scene 2
+            const camera2 = scene2.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -192.4492823342801, 197.83243087813187, -146.9131714907436 ), 
+                    rotation: new Euler(  -2.507137973479189, -0.5622810771276153, -2.7676958136265006 )
+                
+                },
+                camera: {
+
+                    near: 0.1,
+                    far: 1000.0,
+                    viewport: new Vector4( 0.5, 0.0, 0.5, 0.5 )
+
+                }
+
+            } );
+
+            // Add orbit controller for camera 2
+            camera2.addComponent( OrbitController, { damping: true } );
+
+            // Load glb model for scene 2
+            resourceManager.loadGLTF( './assets/models/oldsmobile_cutlass_supreme_sedan_71.glb' ).then( ( resource ) => {
+
+                // Parse gltf resource
+                const entity = GLTFParser.parse( resource, { castShadow: true, receiveShadow: true } );
+
+                // Add to scene 2
+                const { rootEntity } = scene2;
+                rootEntity.addChild( entity );
+
+                // Get world bounds
+                const { min, max } = entity.getWorldBounds( new Box3(), true );
+
+                // Add a directional light for scene 2
+                rootEntity.addComponent( DirectionalLight, {
+
+                    position: new Vector3( 100.0, 100.0, 100.0 ),
+                    color: 'rgb( 153, 187, 187 )',
+                    intensity: 5.0 * Math.PI,
+                    castShadow: true,
+                    shadow: {
+
+                        bias: -0.01,
+                        mapSize: 1024,
+                        camera: {
+                            near: 0.5,
+                            far: 500,
+                            frustumSize: 512
+                        }
+
+                    }
+
+                } );
+
+                // Add a plane
+                const mesh = new Mesh( new PlaneGeometry( 1000, 1000 ), new MeshLambertMaterial( { color: 'rgb( 100, 100, 100 )', emissive: 'rgb( 153, 187, 187 )' } ) );
+                mesh.position.set( 0.0, min.y - 0.5, 0.0 );
+                mesh.rotation.set( -Math.PI * 0.5, 0.0, 0.0 );
+                mesh.receiveShadow = true;
+
+                rootEntity.addComponent( MeshRenderer, { mesh } );
+
+            } );            
+
+            // Active scene 2
+            scene2.isActive = true;
+
+            // Create scene 2
+            const scene3 = new Scene( engine, { 
+                
+                background: 'rgb( 210, 180, 149 )', 
+                environment: { url: './assets/textures/hdr/equirectangular/venice_sunset_1k.hdr' }
+
+            } );
+
+            // Set scene renderer
+            scene3.sceneRenderer = sceneRenderer;
+
+            // Create a perspective camera for scene 2
+            const camera3 = scene3.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -192.4492823342801, 197.83243087813187, -146.9131714907436 ), 
+                    rotation: new Euler(  -2.507137973479189, -0.5622810771276153, -2.7676958136265006 )
+                
+                },
+                camera: {
+
+                    near: 0.1,
+                    far: 1000.0,
+                    viewport: new Vector4( 0.5, 0.5, 0.5, 0.5 )
+
+                }
+
+            } );
+ 
+            // Add orbit controller for camera 3
+            camera3.addComponent( OrbitController, { damping: true } );
+
+            // Load glb model for scene 3
+            resourceManager.loadGLTF( './assets/models/oldsmobile_cutlass_supreme_sedan_71.glb' ).then( ( resource ) => {
+
+                // Parse gltf resource
+                const entity = GLTFParser.parse( resource, { castShadow: true, receiveShadow: true } );
+
+                // Add to scene 3
+                const { rootEntity } = scene3;
+                rootEntity.addChild( entity );
+
+            } );
+
+            // Active scene 2
+            scene3.isActive = true;
+            
+            // Set ui
+            // pane.addBinding( { 'active scene1': true }, 'active scene1' ).on( 'change', ( event ) => {
+
+            //     const { value } = event;
+            //     scene1.isActive = value;
+
+            // } );
+
+            // pane.addBinding( { 'active scene2': true }, 'active scene2' ).on( 'change', ( event ) => {
+
+            //     const { value } = event;
+            //     scene2.isActive = value;
+
+            // } );
+
+            // pane.addBinding( { 'active scene3': true }, 'active scene3' ).on( 'change', ( event ) => {
+
+            //     const { value } = event;
+            //     scene3.isActive = value;
+
+            // } );
+
+		</script>
+	</body>
+</html>

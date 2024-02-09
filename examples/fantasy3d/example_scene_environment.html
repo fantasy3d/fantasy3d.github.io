@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Scene Envrionment</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js",
+            "@fantasy3d/postprocessing": "../dist/fantasy.postprocessing.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Box3, Color, Euler, Vector2, Vector3 } from 'three';
+            import { DirectionalLight, Engine, Entity, EventType, GLTFParser, ModelRenderer, QueryMask, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { OrbitController } from '@fantasy3d/addons';
+            import { BlendFunction, EffectRenderer, SelectiveBloomEffect } from '@fantasy3d/postprocessing';
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false })
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'rgb( 36, 44, 49 )',
+                    powerPreference: "high-performance",
+                    antialias: false,
+                    stencil: false,
+                    depth: false
+
+                }
+
+            } );
+
+            // Create effect renderer
+            const sceneRenderer = new EffectRenderer( engine, { autoClear: true, multisampling: 4, enableNormalPass: false } );
+
+            // Create selective bloom effect. Note that there is no need to set up the scene and camera,
+            // which will be set during rendering.
+            const effect = new SelectiveBloomEffect( null, null, {
+
+                blendFunction: BlendFunction.ADD,
+                mipmapBlur: true,
+                luminanceThreshold: 0.0,
+                luminanceSmoothing: 0.25,
+                intensity: 3.0,
+
+            } );
+
+            // Add selective bloom effect
+            sceneRenderer.addEffect( effect );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Create scene
+            const scene = new Scene( engine, {
+
+                environment: { url: './assets/textures/hdr/equirectangular/venice_sunset_1k.hdr' }
+
+            } );
+
+            // Set scene renderer
+            scene.sceneRenderer = sceneRenderer;
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( -5.512206449699697, 32.7287042869267, 70.78331971402518 ),
+                    rotation: new Euler( -0.2944612796375208, -0.013099738655025553, -0.003972726091345801 )
+                },
+                camera: { near: 0.1, far: 1000.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Add a directional light
+            const { rootEntity } = scene;
+            const directionalLight = rootEntity.addComponent( DirectionalLight, {
+
+                color: '#ffffff',
+                intensity: 1.0 * Math.PI,
+                position: new Vector3( 0.0, 100.0, 100.0 ),
+                target: new Vector3( 0, 0, 0 )
+
+            } );
+
+            // Load glb model
+            engine.resourceManager.loadGLTF( './assets/models/pbr_chart.glb' ).then( ( resource ) => {
+
+                // Parse gltf resource
+                const entity = GLTFParser.parse( resource, { queryMask: QueryMask.Mask0 } );
+
+                // Add to scene
+                const { rootEntity } = scene;
+                rootEntity.addChild( entity );
+
+                // Get world bounds
+                const { min, max } = entity.getWorldBounds( new Box3(), true );
+
+                // Adjust model center
+                entity.transform.position = new Vector3( -( max.x - min.x ) * 0.5, -min.y, -( max.z - min.z ) * 0.5 );
+
+                // Select bloom object
+                const names = [ 'Object_5', 'Object_6', 'Object_7', 'Object_8', 'Object_9' ];
+                const { selection } = effect;
+                Entity.traverse( entity, ( ent ) => {
+
+                    const { name } = ent;
+                    if ( names.includes( name ) ) {
+
+                        const { object3D: meshes } = ent.getComponent( ModelRenderer );
+                        for ( let i = 0, il = meshes.length; i < il; i++ ) {
+
+                            selection.toggle( meshes[ i ] );
+
+                        }
+
+                    }
+
+                } );
+
+            } );
+
+            // Set ui
+            pane.addBlade( {
+
+                view: 'list',
+                label: 'environment',
+                options: [
+                    { text: 'venice_sunset_1k', value: './assets/textures/hdr/equirectangular/venice_sunset_1k.hdr' },
+                    { text: 'royal_esplanade_1k', value: './assets/textures/hdr/equirectangular/royal_esplanade_1k.hdr' },
+                    { text: 'hdr_041_path_env', value: './assets/textures/hdr/equirectangular/HDR_041_Path_Env.hdr' }
+                ],
+                value: './assets/textures/hdr/equirectangular/venice_sunset_1k.hdr'
+
+            } ).on( 'change', ( event ) => {
+
+                const { value: url } = event;
+                scene.environment = { url };
+
+            } );
+
+            const lightFolder = pane.addFolder( { title: 'Directional Light', expanded: true } );
+
+            lightFolder.addBinding( { intensity: 1.0 }, 'intensity', {
+
+                min: 0,
+                max: 5.0,
+                step: 0.1
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                directionalLight.intensity = value * Math.PI;
+
+            } );
+
+            lightFolder.addBinding( { color: '#ffffff' }, 'color', {
+
+                picker: 'inline',
+                expanded: false
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                directionalLight.color = value;
+
+            } );
+
+		</script>
+	</body>
+</html>

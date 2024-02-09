@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Room Shadow</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+        <script type="module">
+
+            import { ACESFilmicToneMapping, Euler, MeshStandardMaterial, PCFSoftShadowMap, Vector2, Vector3 } from 'three';
+            import { AmbientLight, DirectionalLight, Engine, Entity, EventType, GLTFParser, ModelRenderer, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { DirectionalLightHelper, OrbitController } from '@fantasy3d/addons';
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: '#d0d0d0',
+                    toneMapping: ACESFilmicToneMapping,
+                    shadowMap: {
+
+                        enabled: true,
+                        softShadow: { focus: 0.5, samples: 40, size: 35 },
+                        type: PCFSoftShadowMap
+
+                    }
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // Resource manager
+            const { resourceManager } = engine;
+
+            // Set glTFLoader draco loader
+            resourceManager.setDRACOLoader( 'https://www.gstatic.com/draco/versioned/decoders/1.5.5/' );
+
+            // Create scene
+            const scene = new Scene( engine, {
+
+                fog: {
+
+                    near: 8,
+                    far: 35,
+                    color: '#d0d0d0'
+
+                }
+
+            } );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: {
+
+                    position: new Vector3( 0, 8, 8 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { near: 0.1, far: 100 }
+
+            } );
+
+            // Add OrbitController
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Add a ambient light
+            const { rootEntity } = scene;
+            rootEntity.addComponent( AmbientLight, { intensity: 0.4 * Math.PI } );
+
+            // Add a directional light
+            rootEntity.addComponent( DirectionalLight, {
+
+                position: new Vector3( 5, 5, -8 ),
+                intensity: 5.0 * Math.PI,
+                castShadow: true,
+                shadow: {
+
+                    bias: -0.001,
+                    mapSize: 2048,
+                    camera: {
+                        
+                        near: 0.1,
+                        far: 20,
+                        frustumSize: 17
+
+                    }
+
+                }
+
+            } );
+
+            // Add a direction light helper
+            rootEntity.addComponent( DirectionalLightHelper );
+
+            // Load room glb
+            resourceManager.loadGLTF( './assets/models/room-transformed.glb' ).then( ( resource ) => {
+
+                const { nodes, materials } = resource;
+
+                const { material } = nodes[ 'Object_13' ];
+                material.opacity = 0.5;
+
+                // Parse gltf resource
+                const entity = GLTFParser.parse( resource, { castShadow: true, receiveShadow: true } );
+
+                // Add to scene
+                rootEntity.addChild( entity );
+
+                //
+                Entity.traverse( entity, ( ent ) => {
+
+                    if ( ent.name === 'Object_13' ) {
+
+                        //ent.transform.object3D.visible = false;
+                        const model = ent.getComponent( ModelRenderer );
+                        model.castShadow = false;
+                        //model.receiveShadow = false;
+
+                    }
+
+                } );
+
+                // Update transformation
+                const { transform } = entity;
+                transform.position = new Vector3( 0, -1, 0 );
+                transform.scale = new Vector3( 0.5, 0.5, 0.5 );
+
+            } );
+
+        </script>
+    </body>
+</html>

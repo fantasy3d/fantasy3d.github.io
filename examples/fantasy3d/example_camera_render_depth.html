@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Camera Render Depth</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+        <script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Box3, DoubleSide, Euler, LinearFilter, Mesh, HalfFloatType, PlaneGeometry, ShaderMaterial, Vector3, Vector4 } from 'three';
+            import { AmbientLight, Animator, Engine, EventType, GLTFParser, MeshRenderer, PerspectiveCamera, Scene, SceneRenderer, createFBO } from '@fantasy3d/core';
+            import { OrbitController } from '@fantasy3d/addons';
+
+            const vertexShader = `
+                varying vec2 vUv;
+
+                void main() {
+
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+                }
+            `;
+
+            const fragmentShader = `
+                #include <packing>
+
+                varying vec2 vUv;
+                uniform sampler2D tDepth;
+                uniform float cameraNear;
+                uniform float cameraFar;
+
+                float readDepth( sampler2D depthSampler, vec2 coord ) {
+                    float fragCoordZ = texture2D( depthSampler, coord ).x;
+                    float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+                    return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+                }
+
+                void main() {
+                    float depth = readDepth( tDepth, vUv );
+
+                    gl_FragColor.rgb = 1.0 - vec3( depth );
+                    gl_FragColor.a = 1.0;
+                }
+                `;
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'black',
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+
+            // resource manager
+            const { resourceManager } = engine;
+
+            // Create scene renderer
+            const sceneRenderer = new SceneRenderer( engine );
+
+            // Create scene
+            const scene = new Scene( engine, {
+
+                background: 'rgb( 201, 207, 183 )',
+                environment: { url: './assets/textures/hdr/equirectangular/HDR_041_Path_Env.hdr' },
+
+            } );
+
+            // Set scene renderer
+            scene.sceneRenderer = sceneRenderer;
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0, 100, 200 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { near: 0.1, far: 1000.0, enableDepth: true }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Add a ambient light
+            scene.rootEntity.addComponent( AmbientLight, { intensity: 0.15 * Math.PI } );
+
+            // Load glb
+            resourceManager.loadGLTF( './assets/models/medieval_fantasy_book.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                scene.rootEntity.addChild( entity );
+
+                // Get Animator component
+                const { controller } = entity.getComponent( Animator );
+
+                // Play 'The Life' animation
+                controller.play( 'The Life' );
+
+            } );
+
+            // Create depth scene
+            const depthScene = new Scene( engine );
+
+            // Set scene renderer
+            depthScene.sceneRenderer = sceneRenderer;
+
+            // Active scene
+            depthScene.isActive = true;
+
+            // Create a orthographic camera for depth scene
+            const depthCamera = depthScene.createOrthographicCamera( {
+
+                transform: { position: new Vector3( 0.0, 2.0, 12.0 ) },
+                camera: { 
+                    
+                    near: 0.1, 
+                    far: 20, 
+                    frustumSize: 4,
+                    viewport: new Vector4( 0.8, 0.7, 0.2, 0.3 )
+
+                }
+
+            } );
+
+            // Create plane for depth scene
+            const entity = depthScene.rootEntity.createChild( { transform: { position: new Vector3( 0.0, 2.0, 0.0 ) } } );
+            
+            // Get PerspectiveCamera, use the main scene camera's depth texture as plane's map
+            const perspectiveCamera = camera.getComponent( PerspectiveCamera );
+
+            // Add a MeshRenderer component
+            const material = new ShaderMaterial( {
+
+                vertexShader,
+                fragmentShader,
+
+                uniforms: {
+
+                    tDepth: { value: perspectiveCamera.depthTexture },
+                    cameraNear: { value: 0.1 },
+                    cameraFar: { value: 1000.0 }
+
+                },
+
+                toneMapped: false,
+                fog: false
+
+            } );
+
+            const mesh = new Mesh( new PlaneGeometry( 4, 4 ), material )
+
+            entity.addComponent( MeshRenderer, { mesh } );
+
+        </script>
+    </body>
+</html>
