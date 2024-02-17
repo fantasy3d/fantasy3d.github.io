@@ -1,4 +1,4 @@
-import{_ as o}from"./plugin-vue_export-helper-x3n3nnut.js";import{r as c,o as l,c as i,f as u,w as a,d as n,e as s,g as r}from"./app-U0-pvpy_.js";const k="/assets/image/fantasy-quick-start.jpg",d={},m=n("p",null,"本教程将会指引你如何使用Fantasy 3D开发项目。",-1),v=n("h2",{id:"安装",tabindex:"-1"},[n("a",{class:"header-anchor",href:"#安装","aria-hidden":"true"},"#"),s(" 安装")],-1),b=n("div",{class:"language-bash line-numbers-mode","data-ext":"sh"},[n("pre",{class:"language-bash"},[n("code",null,[s(`// 安装核心包
+import{_ as o}from"./plugin-vue_export-helper-x3n3nnut.js";import{r as c,o as l,c as i,f as u,w as a,d as n,e as s,g as r}from"./app-QZVTRBrv.js";const k="/assets/image/fantasy-quick-start.jpg",d={},m=n("p",null,"本教程将会指引你如何使用Fantasy 3D开发项目。",-1),v=n("h2",{id:"安装",tabindex:"-1"},[n("a",{class:"header-anchor",href:"#安装","aria-hidden":"true"},"#"),s(" 安装")],-1),b=n("div",{class:"language-bash line-numbers-mode","data-ext":"sh"},[n("pre",{class:"language-bash"},[n("code",null,[s(`// 安装核心包
 `),n("span",{class:"token function"},"npm"),s(` i @fantasy3d/core
 
 // 安装插件包
