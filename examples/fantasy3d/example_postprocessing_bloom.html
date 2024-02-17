@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Postprocessing Bloom</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js",
+            "@fantasy3d/postprocessing": "../dist/fantasy.postprocessing.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
+            import { Vector3 } from 'three';
+            import { AmbientLight, Animator, Engine, EventType, GLTFParser, Scene } from '@fantasy3d/core';
+            import { Floating, OrbitController } from '@fantasy3d/addons';
+            import { BloomEffect, EffectRenderer } from '@fantasy3d/postprocessing';
+
+            // Create ui
+            const pane = new Pane( { container: document.getElementById( 'gui_container' ), title: 'options', expanded: false })
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'rgb( 36, 44, 49 )',
+                    powerPreference: "high-performance",
+                    antialias: false,
+                    stencil: false,
+                    depth: false
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME, () => {
+
+                stats.update();
+
+            } );
+            
+            // Create effect renderer
+            const effectRenderer = new EffectRenderer( engine, { multisampling: 4, enableNormalPass: true } );
+
+            // Create bloom effect
+            const bloom = new BloomEffect( {
+
+                mipmapBlur: true,
+                intensity: 1.75,
+                luminanceThreshold: 0.15,
+                luminanceSmoothing: 0
+
+            } );
+
+            // Add bloom effect
+            effectRenderer.addEffect( bloom );
+
+            // Create scene
+            const scene = new Scene( engine );
+
+            // Set scene renderer
+            scene.sceneRenderer = effectRenderer;
+
+            // Active scene
+            scene.isActive = true;
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0, 5, 5 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+                },
+                camera: { near: 0.1, far: 200.0 }
+
+            } );
+
+            // Add Orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+
+            // Add AmbientLight
+            const { rootEntity } = scene;
+            rootEntity.addComponent( AmbientLight, { intensity: Math.PI } );
+
+            // Load glb model
+            engine.resourceManager.loadGLTF( './assets/models/PrimaryIonDrive.glb' ).then( ( resource ) => {
+
+                // Parse gltf resource
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                rootEntity.addChild( entity );
+
+                // Add a Floating script
+                entity.addComponent( Floating, {
+
+                    floatingIntensity: 4,
+                    rotationIntensity: 5
+
+                } );
+
+                // Play animation
+                const { controller } = entity.getComponent( Animator );
+                controller.play( 'Main' );
+
+            } );
+
+            // Set ui
+            const params = {
+
+                intensity: 1.75,
+                luminanceThreshold: 0.15,
+                luminanceSmoothing: 0
+
+            }
+
+            pane.addBinding( params, 'intensity', {
+
+                min: 0,
+                max: 5,
+                step: 0.05
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                bloom.intensity = value;
+
+            } );
+
+            const { luminanceMaterial } = bloom;
+
+            pane.addBinding( params, 'luminanceThreshold', {
+
+                min: 0,
+                max: 5,
+                step: 0.05
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                luminanceMaterial.threshold = value;
+
+            } );
+
+            pane.addBinding( params, 'luminanceSmoothing', {
+
+                min: 0,
+                max: 5,
+                step: 0.05
+
+            } ).on( 'change', ( event ) => {
+
+                const { value } = event;
+                luminanceMaterial.smoothing = value;
+
+            } );
+
+        </script>
+    </body>
+</html>

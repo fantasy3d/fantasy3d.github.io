@@ -160,7 +160,18 @@ const exampleConfig = {
     "FANTASY_3D_POSTPROCESSING": {
         name: "后期效果",
         name_en: "Postprocessing",
-        content: []
+        content: {
+            "FANTASY_3D_POSPROCESSING_BLOOM": {
+                name: "泛光",
+                name_en: "Bloom",
+                content: [{
+                    name: "泛光",
+                    name_en: "Bloom",
+                    thumbnail: "example_postprocessing_bloom.png",
+                    fileName: "example_postprocessing_bloom"
+                }]
+            }
+        }
     }
 };
 
