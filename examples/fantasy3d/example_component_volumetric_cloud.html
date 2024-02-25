@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Volumetric Cloud Component</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+		<script type="module">
+
+            import { Vector3 } from 'three';
+            import { AmbientLight, Animator, Engine, EventType, GLTFParser, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { OrbitController, VolumetricCloud } from '@fantasy3d/addons';
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: '#171717'
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME_LOOP, () => {
+
+                stats.update();
+
+            } );
+
+            // Create scene
+            const scene = new Scene( engine, {
+
+                background: { url: './assets/textures/hdr/equirectangular/HDR_041_Path_Env.hdr' },
+                environment: { url: './assets/textures/hdr/equirectangular/HDR_041_Path_Env.hdr' }
+
+            } );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0.0, 60, 60 ),
+                    lookAt: new Vector3( 0, 0, 0 )
+
+                },
+                camera: { near: 0.1, far: 1000.0, enableDepth: true }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+            
+            // Active scene
+            scene.isActive = true;
+
+            // Add a ambient light
+            scene.rootEntity.addComponent( AmbientLight, { intensity: 0.15 * Math.PI } );
+
+            // Load glb
+            engine.resourceManager.loadGLTF( './assets/models/medieval_fantasy_book.glb' ).then( ( resource ) => {
+
+                // Parse glb
+                const entity = GLTFParser.parse( resource );
+
+                // Add to scene
+                scene.rootEntity.addChild( entity );
+
+                // Get Animator component
+                const { controller } = entity.getComponent( Animator );
+
+                // Play 'The Life' animation
+                controller.play( 'The Life' );
+
+            } );            
+            
+            //
+            const { rootEntity } = scene;
+            rootEntity.addComponent( VolumetricCloud, {
+
+                min: new Vector3( -20.0, 0.0, -20.0 ),
+                max: new Vector3( 20.0, 5.0, 20.0 ),
+                noise: './assets/textures/noise.png'
+
+            } );
+
+        </script>
+    </body>
+</html>

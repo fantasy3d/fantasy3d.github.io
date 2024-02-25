@@ -31,7 +31,7 @@
 	</head>
 	<body>
         <div id="gui_container"></div>
-		<div id="viewport" style="width:100%; height:100%"></div>
+        <div id="viewport" style="width:100%; height:100%"></div>
 		<script src='./js/libs/stats.min.js'></script>
         <script src="./js/loadscripts.js"></script>
         <script>loadscripts( { 
@@ -68,7 +68,7 @@
             } );
 
             // Update stats
-            engine.on( EventType.BEFORE_FRAME, () => {
+            engine.on( EventType.BEFORE_FRAME_LOOP, () => {
 
                 stats.update();
 

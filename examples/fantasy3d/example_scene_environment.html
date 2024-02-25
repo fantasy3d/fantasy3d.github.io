@@ -92,7 +92,7 @@
             sceneRenderer.addEffect( effect );
 
             // Update stats
-            engine.on( EventType.BEFORE_FRAME, () => {
+            engine.on( EventType.BEFORE_FRAME_LOOP, () => {
 
                 stats.update();
 

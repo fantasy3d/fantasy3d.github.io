@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<title>Fantasy 3D Worley 2D Noise</title>
+		<style>
+			html {
+				height: 100%;
+			}
+	
+			body
+			{
+				font-family: Monospace;
+				font-weight: bold;
+				margin: 0px;
+				height: 100%;
+				overflow: hidden;
+			}
+
+            #gui_container{
+				position: absolute;
+				top: 1%;
+				left: 45%;
+			}
+
+			#gui{
+				transform:translate(-50%, -60px);
+			}
+		</style>
+	</head>
+	<body>
+        <div id="gui_container"></div>
+		<div id="viewport" style="width:100%; height:100%"></div>
+		<script src='./js/libs/stats.min.js'></script>
+        <script src="./js/loadscripts.js"></script>
+        <script>loadscripts( { 
+            
+            "@fantasy3d/core": "../dist/fantasy.core.js",
+            "@fantasy3d/addons": "../dist/fantasy.addons.js"
+            
+        } )</script>
+        <script type="module">
+
+            import { Color, DataTexture, FloatType, Mesh, MeshBasicMaterial, PlaneGeometry, RedFormat, RepeatWrapping, ShaderMaterial, Vector2, Vector3 } from 'three';
+            import { Engine, EventType, MeshRenderer, PerlinNoise, Scene, SceneRenderer } from '@fantasy3d/core';
+            import { OrbitController } from '@fantasy3d/addons';
+
+            const vertexShader = `
+                varying vec2 vUv;
+
+                void main() {
+
+                    vUv = uv;
+                    gl_Position = gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+                }
+            `;
+
+            const fragmentShader = `
+                uniform sampler2D noiseMap;
+
+                varying vec2 vUv;
+
+                void main() {
+
+                    float noise = texture2D( noiseMap, vUv ).r;
+
+                    gl_FragColor = vec4( vec3( noise ), 1.0 );
+
+                }
+            `;
+
+            // Create stats
+            const stats = new Stats();
+            document.body.appendChild( stats.dom );
+
+            // Create engine
+            const engine = new Engine( {
+
+                // WebGL options
+                gl: {
+
+                    viewport: document.getElementById( 'viewport' ),
+                    clearColor: 'rgb( 201, 207, 183 )'
+
+                }
+
+            } );
+
+            // Update stats
+            engine.on( EventType.BEFORE_FRAME_LOOP, () => {
+
+                stats.update();
+
+            } );
+            
+            // Create scene
+            const scene = new Scene( engine );
+
+            // Set scene renderer
+            scene.sceneRenderer = new SceneRenderer( engine );
+
+            // Create a perspective camera
+            const camera = scene.createPerspectiveCamera( {
+
+                transform: { 
+                    
+                    position: new Vector3( 0.0, 5.0, 5.0 ),
+                    lookAt: new Vector3( 0.0, 0.0, 0.0 )
+
+                },
+                camera: { near: 0.1, far: 1000.0 }
+
+            } );
+
+            // Add orbitcontroller
+            camera.addComponent( OrbitController, { damping: true } );
+            
+            // Active scene
+            scene.isActive = true;
+
+            // Create a plane to display the noise
+            const { rootEntity } = scene;
+            const entity = rootEntity.createChild();
+
+            const material = new ShaderMaterial( {
+
+                uniforms: {
+
+                    color: { value: new Color( 1.0, 1.0, 1.0 ) },
+                    time: engine.uniformsLib.time,
+                    noiseMap: { value: generateWorleyNoiseTexture( 256 ) }
+
+                },
+
+                vertexShader,
+                fragmentShader,
+
+                transparent: true
+
+            } );
+
+            entity.addComponent( MeshRenderer, {
+
+                mesh: new Mesh( new PlaneGeometry( 4, 4 ), material )
+
+            } );
+
+            /**
+             * Generate Noise Texture
+             */ 
+            function generateWorleyNoiseTexture( resolution = 128 ) {
+
+                const perlin = new PerlinNoise();
+
+                const size = resolution * resolution;
+                const data = new Float32Array( size );
+
+                for ( let i = 0; i < resolution; i++ ) {
+
+                    for ( let j = 0; j < resolution; j++ ) {
+
+                        data[ i * resolution + j ] = perlin.noise2d( i + Math.random(), j + Math.random() );
+
+                    }
+
+                }
+
+                const texture = new DataTexture( data, resolution, resolution, RedFormat, FloatType );
+                texture.wrapS = RepeatWrapping;
+                texture.wrapT = RepeatWrapping;
+                texture.needsUpdate = true;
+
+                return texture;
+
+            }
+
+        </script>
+    </body>
+</html>

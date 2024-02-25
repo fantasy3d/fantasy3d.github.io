@@ -44,7 +44,7 @@
 
             import { Pane } from './js/libs/tweakpane-4.0.3.min.js';
             import { Box3, DoubleSide, Euler, LinearFilter, Mesh, HalfFloatType, PlaneGeometry, ShaderMaterial, Vector3, Vector4 } from 'three';
-            import { AmbientLight, Animator, Engine, EventType, GLTFParser, MeshRenderer, PerspectiveCamera, Scene, SceneRenderer, createFBO } from '@fantasy3d/core';
+            import { AmbientLight, Animator, Engine, EventType, GLTFParser, MeshRenderer, PerspectiveCamera, Scene, SceneRenderer } from '@fantasy3d/core';
             import { OrbitController } from '@fantasy3d/addons';
 
             const vertexShader = `
@@ -98,7 +98,7 @@
             } );
 
             // Update stats
-            engine.on( EventType.BEFORE_FRAME, () => {
+            engine.on( EventType.BEFORE_FRAME_LOOP, () => {
 
                 stats.update();
 
