@@ -1,1 +1,0 @@
-import{_ as s}from"./plugin-vue_export-helper-x3n3nnut.js";import{r as a,o as e,c as r,F as c,f as l,g as f,m as i}from"./app-B84DVLuZ.js";const m={};function _(o,u){const t=a("SiteInfo");return e(),r("div",null,[(e(!0),r(c,null,l(o.$frontmatter.official,n=>(e(),f(t,i({key:n.link},n),null,16))),128))])}const k=s(m,[["render",_],["__file","index.html.vue"]]);export{k as default};
